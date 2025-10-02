@@ -425,6 +425,29 @@ main {
     border-radius: 2px;
 }
 
+/* Hidden changes from grouped changes toggle */
+.change-hidden {
+    opacity: 0.2;
+    filter: grayscale(100%);
+    text-decoration: none !important;
+}
+
+.change-hidden.removed,
+.change-hidden.added {
+    background-color: #e9ecef;
+    color: #6c757d;
+}
+
+/* Button state for showing hidden changes */
+.toggle-visibility-btn.showing-hidden {
+    background-color: #6c757d;
+    color: white;
+}
+
+.toggle-visibility-btn.showing-hidden:hover {
+    background-color: #5a6268;
+}
+
 /* Search Highlighting */
 .highlight {
     background-color: #fff3cd;

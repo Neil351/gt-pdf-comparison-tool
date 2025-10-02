@@ -62,8 +62,6 @@ class ComparisonEngine {
         const lines1 = text1.split('\n');
         const lines2 = text2.split('\n');
 
-        let doc1HTML = '';
-        let doc2HTML = '';
         let stats = {
             addedCount: 0,
             removedCount: 0,
@@ -74,7 +72,50 @@ class ComparisonEngine {
         // Use diff_match_patch on the line arrays
         const linesDiff = this.dmp.diff_main(lines1.join('\n'), lines2.join('\n'));
         this.dmp.diff_cleanupSemantic(linesDiff);
-        
+
+        // First pass: collect changes
+        linesDiff.forEach(([operation, text]) => {
+            const lines = text.split('\n');
+
+            if (operation === 0) { // No change
+                lines.forEach(line => {
+                    stats.unchangedCount += line.length;
+                });
+            } else if (operation === -1) { // Deletion
+                lines.forEach(line => {
+                    if (line.trim()) {
+                        stats.removedCount += line.split(/\s+/).filter(w => w).length;
+                        changes.push({ type: 'removed', text: line.trim() });
+                    }
+                });
+            } else if (operation === 1) { // Addition
+                lines.forEach(line => {
+                    if (line.trim()) {
+                        stats.addedCount += line.split(/\s+/).filter(w => w).length;
+                        changes.push({ type: 'added', text: line.trim() });
+                    }
+                });
+            }
+        });
+
+        // Group changes and create lookup map
+        const groupedChanges = this.groupChanges(changes);
+        const textToGroupKey = new Map();
+
+        groupedChanges.forEach(group => {
+            // Map both removed and added text to this group key
+            if (group.removed) {
+                textToGroupKey.set(`removed:${group.removed.toLowerCase()}`, group.key);
+            }
+            if (group.added) {
+                textToGroupKey.set(`added:${group.added.toLowerCase()}`, group.key);
+            }
+        });
+
+        // Second pass: generate HTML with group keys
+        let doc1HTML = '';
+        let doc2HTML = '';
+
         linesDiff.forEach(([operation, text]) => {
             const lines = text.split('\n');
 
@@ -87,32 +128,24 @@ class ComparisonEngine {
                     } else {
                         doc1HTML += Utils.escapeHtml(line) + '\n';
                         doc2HTML += Utils.escapeHtml(line) + '\n';
-                        stats.unchangedCount += line.length;
                     }
                 });
             } else if (operation === -1) { // Deletion
                 lines.forEach(line => {
                     if (line.trim()) {
-                        doc1HTML += `<span class="removed">${Utils.escapeHtml(line)}</span>\n`;
-                        stats.removedCount += line.split(/\s+/).filter(w => w).length;
-                        // Track removed text for grouping
-                        changes.push({ type: 'removed', text: line.trim() });
+                        const groupKey = textToGroupKey.get(`removed:${line.trim().toLowerCase()}`) || '';
+                        doc1HTML += `<span class="removed" data-group="${groupKey}">${Utils.escapeHtml(line)}</span>\n`;
                     }
                 });
             } else if (operation === 1) { // Addition
                 lines.forEach(line => {
                     if (line.trim()) {
-                        doc2HTML += `<span class="added">${Utils.escapeHtml(line)}</span>\n`;
-                        stats.addedCount += line.split(/\s+/).filter(w => w).length;
-                        // Track added text for grouping
-                        changes.push({ type: 'added', text: line.trim() });
+                        const groupKey = textToGroupKey.get(`added:${line.trim().toLowerCase()}`) || '';
+                        doc2HTML += `<span class="added" data-group="${groupKey}">${Utils.escapeHtml(line)}</span>\n`;
                     }
                 });
             }
         });
-
-        // Group changes
-        const groupedChanges = this.groupChanges(changes);
 
         return {
             doc1HTML,
@@ -155,8 +188,6 @@ class ComparisonEngine {
     }
 
     formatDiffsToHTML(diffs) {
-        let doc1HTML = '';
-        let doc2HTML = '';
         let stats = {
             addedCount: 0,
             removedCount: 0,
@@ -164,31 +195,53 @@ class ComparisonEngine {
         };
         const changes = []; // Track individual changes for grouping
 
+        // First pass: collect changes
         diffs.forEach(([operation, text]) => {
             if (operation === 0) {
-                // No change
-                doc1HTML += Utils.escapeHtml(text);
-                doc2HTML += Utils.escapeHtml(text);
                 stats.unchangedCount += text.length;
             } else if (operation === -1) { // Deletion
-                doc1HTML += `<span class="removed">${Utils.escapeHtml(text)}</span>`;
                 stats.removedCount += text.split(/\s+/).filter(w => w).length;
-                // Track removed text for grouping
                 if (text.trim()) {
                     changes.push({ type: 'removed', text: text.trim() });
                 }
             } else if (operation === 1) { // Addition
-                doc2HTML += `<span class="added">${Utils.escapeHtml(text)}</span>`;
                 stats.addedCount += text.split(/\s+/).filter(w => w).length;
-                // Track added text for grouping
                 if (text.trim()) {
                     changes.push({ type: 'added', text: text.trim() });
                 }
             }
         });
 
-        // Group changes
+        // Group changes and create lookup map
         const groupedChanges = this.groupChanges(changes);
+        const textToGroupKey = new Map();
+
+        groupedChanges.forEach(group => {
+            if (group.removed) {
+                textToGroupKey.set(`removed:${group.removed.toLowerCase()}`, group.key);
+            }
+            if (group.added) {
+                textToGroupKey.set(`added:${group.added.toLowerCase()}`, group.key);
+            }
+        });
+
+        // Second pass: generate HTML with group keys
+        let doc1HTML = '';
+        let doc2HTML = '';
+
+        diffs.forEach(([operation, text]) => {
+            if (operation === 0) {
+                // No change
+                doc1HTML += Utils.escapeHtml(text);
+                doc2HTML += Utils.escapeHtml(text);
+            } else if (operation === -1) { // Deletion
+                const groupKey = textToGroupKey.get(`removed:${text.trim().toLowerCase()}`) || '';
+                doc1HTML += `<span class="removed" data-group="${groupKey}">${Utils.escapeHtml(text)}</span>`;
+            } else if (operation === 1) { // Addition
+                const groupKey = textToGroupKey.get(`added:${text.trim().toLowerCase()}`) || '';
+                doc2HTML += `<span class="added" data-group="${groupKey}">${Utils.escapeHtml(text)}</span>`;
+            }
+        });
 
         return {
             doc1HTML,

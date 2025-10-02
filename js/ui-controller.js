@@ -367,29 +367,33 @@ class UIController {
     toggleChangeGroupVisibility(groupKey, button) {
         const isVisible = button.dataset.visible === 'true';
 
-        // Find all changes in the document that match this group key (case-insensitive)
-        const doc1Changes = this.elements.doc1Content.querySelectorAll('.removed');
-        const doc2Changes = this.elements.doc2Content.querySelectorAll('.added');
+        // Find all elements with this group key in both documents
+        const selector = `[data-group="${groupKey}"]`;
+        const doc1Elements = this.elements.doc1Content.querySelectorAll(selector);
+        const doc2Elements = this.elements.doc2Content.querySelectorAll(selector);
 
-        // This is a simplified implementation - in a full version, you'd need to track
-        // which specific elements belong to which group
-        // For now, we'll just toggle the opacity as a demonstration
+        const allElements = [...doc1Elements, ...doc2Elements];
 
         if (isVisible) {
             // Hide this group
+            allElements.forEach(el => el.classList.add('change-hidden'));
             button.textContent = 'Show';
             button.dataset.visible = 'false';
-            // Add a class to mark as hidden (would need more sophisticated tracking in production)
+            button.classList.add('showing-hidden');
         } else {
             // Show this group
+            allElements.forEach(el => el.classList.remove('change-hidden'));
             button.textContent = 'Hide';
             button.dataset.visible = 'true';
-            // Remove hidden class
+            button.classList.remove('showing-hidden');
         }
 
         // Show a notification
+        const count = allElements.length;
         this.showNotification(
-            isVisible ? `Hidden changes matching this pattern` : `Showing changes matching this pattern`,
+            isVisible
+                ? `Hidden ${count} occurrence(s) of this change`
+                : `Showing ${count} occurrence(s) of this change`,
             'info'
         );
     }
