@@ -145,42 +145,74 @@ function showLibraryError(missingLibraries) {
         z-index: 10000;
     `;
 
-    errorContainer.innerHTML = `
-        <h2 style="margin-top: 0; color: #721c24;">⚠️ Failed to Load Required Libraries</h2>
-        <p style="margin: 15px 0;">The following libraries could not be loaded:</p>
-        <ul style="list-style: none; padding: 0; margin: 15px 0;">
-            ${missingLibraries.map(lib => `<li style="margin: 5px 0;"><strong>${lib}</strong></li>`).join('')}
-        </ul>
-        <p style="margin: 15px 0;">This may be due to:</p>
-        <ul style="text-align: left; margin: 10px 20px;">
-            <li>Network connectivity issues</li>
-            <li>CDN unavailability</li>
-            <li>Firewall or ad-blocker restrictions</li>
-            <li>Content Security Policy violations</li>
-        </ul>
-        <p style="margin: 15px 0; font-weight: bold;">Please check your internet connection and reload the page.</p>
-        <button onclick="location.reload()" style="
-            background: #dc3545;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 16px;
-            margin-top: 10px;
-        ">Reload Page</button>
+    // Use DOM methods instead of innerHTML to prevent XSS
+    const title = document.createElement('h2');
+    title.style.cssText = 'margin-top: 0; color: #721c24;';
+    title.textContent = '⚠️ Failed to Load Required Libraries';
+    errorContainer.appendChild(title);
+
+    const message = document.createElement('p');
+    message.style.cssText = 'margin: 15px 0;';
+    message.textContent = 'The following libraries could not be loaded:';
+    errorContainer.appendChild(message);
+
+    const libList = document.createElement('ul');
+    libList.style.cssText = 'list-style: none; padding: 0; margin: 15px 0;';
+    missingLibraries.forEach(lib => {
+        const li = document.createElement('li');
+        li.style.cssText = 'margin: 5px 0;';
+        const strong = document.createElement('strong');
+        strong.textContent = lib; // textContent auto-escapes
+        li.appendChild(strong);
+        libList.appendChild(li);
+    });
+    errorContainer.appendChild(libList);
+
+    const reasonMessage = document.createElement('p');
+    reasonMessage.style.cssText = 'margin: 15px 0;';
+    reasonMessage.textContent = 'This may be due to:';
+    errorContainer.appendChild(reasonMessage);
+
+    const reasonList = document.createElement('ul');
+    reasonList.style.cssText = 'text-align: left; margin: 10px 20px;';
+    const reasons = [
+        'Network connectivity issues',
+        'CDN unavailability',
+        'Firewall or ad-blocker restrictions',
+        'Content Security Policy violations'
+    ];
+    reasons.forEach(reason => {
+        const li = document.createElement('li');
+        li.textContent = reason;
+        reasonList.appendChild(li);
+    });
+    errorContainer.appendChild(reasonList);
+
+    const instruction = document.createElement('p');
+    instruction.style.cssText = 'margin: 15px 0; font-weight: bold;';
+    instruction.textContent = 'Please check your internet connection and reload the page.';
+    errorContainer.appendChild(instruction);
+
+    const button = document.createElement('button');
+    button.style.cssText = `
+        background: #dc3545;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 16px;
+        margin-top: 10px;
     `;
+    button.textContent = 'Reload Page';
+    button.addEventListener('click', () => location.reload());
+    errorContainer.appendChild(button);
 
     document.body.appendChild(errorContainer);
 }
 
 // Display user-friendly error when app initialization fails
 function showInitializationError(message) {
-    // Safely escape HTML even if Utils is not available
-    const escapedMessage = typeof Utils !== 'undefined' && Utils.escapeHtml
-        ? Utils.escapeHtml(message)
-        : String(message).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
-
     const errorContainer = document.createElement('div');
     errorContainer.style.cssText = `
         position: fixed;
@@ -198,23 +230,36 @@ function showInitializationError(message) {
         z-index: 10000;
     `;
 
-    errorContainer.innerHTML = `
-        <h2 style="margin-top: 0; color: #721c24;">⚠️ Initialization Failed</h2>
-        <p style="margin: 15px 0;">The PDF Comparison Tool failed to initialize:</p>
-        <p style="margin: 15px 0; padding: 10px; background: #fff; border-radius: 4px; font-family: monospace; font-size: 14px;">
-            ${escapedMessage}
-        </p>
-        <button onclick="location.reload()" style="
-            background: #dc3545;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 16px;
-            margin-top: 10px;
-        ">Reload Page</button>
+    // Use DOM methods instead of innerHTML to prevent XSS
+    const title = document.createElement('h2');
+    title.style.cssText = 'margin-top: 0; color: #721c24;';
+    title.textContent = '⚠️ Initialization Failed';
+    errorContainer.appendChild(title);
+
+    const description = document.createElement('p');
+    description.style.cssText = 'margin: 15px 0;';
+    description.textContent = 'The PDF Comparison Tool failed to initialize:';
+    errorContainer.appendChild(description);
+
+    const errorMessage = document.createElement('p');
+    errorMessage.style.cssText = 'margin: 15px 0; padding: 10px; background: #fff; border-radius: 4px; font-family: monospace; font-size: 14px;';
+    errorMessage.textContent = message; // textContent auto-escapes
+    errorContainer.appendChild(errorMessage);
+
+    const button = document.createElement('button');
+    button.style.cssText = `
+        background: #dc3545;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 16px;
+        margin-top: 10px;
     `;
+    button.textContent = 'Reload Page';
+    button.addEventListener('click', () => location.reload());
+    errorContainer.appendChild(button);
 
     document.body.appendChild(errorContainer);
 }

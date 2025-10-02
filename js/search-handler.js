@@ -75,6 +75,19 @@ class SearchHandler {
         const MAX_ITERATIONS = 100000; // Safety limit to prevent infinite loops
 
         while ((match = searchRegex.exec(text)) !== null) {
+            // Always increment iteration count, even for empty matches
+            iterationCount++;
+
+            // Safety check for too many iterations
+            if (iterationCount > MAX_ITERATIONS) {
+                console.error('Search iteration limit exceeded. Stopping search.');
+                // Show user notification if available
+                if (this.showNotification && typeof this.showNotification === 'function') {
+                    this.showNotification('Search limit reached, results may be incomplete', 'warning');
+                }
+                break;
+            }
+
             // Prevent infinite loop on empty matches
             if (match[0].length === 0) {
                 searchRegex.lastIndex++;
@@ -86,13 +99,6 @@ class SearchHandler {
                 length: searchTerm.length,
                 text: match[0]
             });
-
-            // Safety check for too many iterations
-            iterationCount++;
-            if (iterationCount > MAX_ITERATIONS) {
-                console.error('Search iteration limit exceeded. Stopping search.');
-                break;
-            }
         }
         // Highlight all matches
         if (matches.length > 0) {
