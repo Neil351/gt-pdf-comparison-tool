@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; worker-src blob:; connect-src 'self' blob:;">
+    <title>PDF Comparison Tool</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <!-- External Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/diff_match_patch/20121119/diff_match_patch.js"></script>
+</head>
+<body>
+    <header>
+        <h1>PDF Comparison Tool</h1>
+        <p>Upload two PDF files to compare their text content</p>
+    </header>
+
+    <main>
+        <!-- File Upload Section -->
+        <section class="upload-section">
+            <div class="upload-container">
+                <div id="drop1" class="drop-zone">
+                    <input type="file" id="pdf1" accept=".pdf" />
+                    <label for="pdf1">
+                        <svg width="50" height="50" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        <span>Choose Original PDF or drag & drop</span>
+                    </label>
+                    <div id="file1-info" class="file-info">No file selected</div>
+                </div>
+
+                <div id="drop2" class="drop-zone">
+                    <input type="file" id="pdf2" accept=".pdf" />
+                    <label for="pdf2">
+                        <svg width="50" height="50" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        <span>Choose Modified PDF or drag & drop</span>
+                    </label>
+                    <div id="file2-info" class="file-info">No file selected</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Options Section -->
+        <section class="options-section">
+            <h2>Comparison Options</h2>
+            <div class="options-grid">
+                <label class="option">
+                    <input type="checkbox" id="ignoreCase">
+                    <span>Ignore case differences</span>
+                </label>
+                <label class="option">
+                    <input type="checkbox" id="ignoreWhitespace">
+                    <span>Ignore whitespace differences</span>
+                </label>
+                <label class="option">
+                    <input type="checkbox" id="wordLevel" checked>
+                    <span>Word-level comparison</span>
+                </label>
+                <label class="option">
+                    <input type="checkbox" id="preserveFormat" checked>
+                    <span>Preserve document formatting</span>
+                </label>
+                <label class="option">
+                    <input type="checkbox" id="syncScroll" checked>
+                    <span>Synchronize scrolling</span>
+                </label>
+            </div>
+        </section>
+        <!-- Action Buttons -->
+        <section class="action-section">
+            <button id="compareBtn" class="btn btn-primary" disabled>Compare PDFs</button>
+            <button id="clearBtn" class="btn btn-secondary">Clear All</button>
+        </section>
+
+        <!-- Results Section -->
+        <section id="results" class="results-section" style="display: none;">
+            <!-- Search Bar -->
+            <div class="search-bar">
+                <div class="search-input-group">
+                    <input type="text" id="searchInput" placeholder="Search in documents..." />
+                    <button id="searchBtn" class="btn btn-small">Search</button>
+                    <button id="clearSearchBtn" class="btn btn-small">Clear</button>
+                </div>
+                <label class="option">
+                    <input type="checkbox" id="caseSensitive">
+                    <span>Case sensitive</span>
+                </label>
+            </div>
+
+            <!-- Search Results Info -->
+            <div class="search-results" style="display: none;">
+                <div class="search-counts">
+                    <span id="doc1SearchCount">Original: 0 results</span>
+                    <span id="doc2SearchCount">Modified: 0 results</span>
+                </div>
+                <div class="search-navigation">
+                    <button id="prevSearchBtn" class="btn btn-small" disabled>Previous</button>
+                    <span id="searchPosition">0 / 0</span>
+                    <button id="nextSearchBtn" class="btn btn-small" disabled>Next</button>
+                </div>
+            </div>
+
+            <!-- Statistics -->
+            <div class="statistics">
+                <div class="stat-card">
+                    <h3>Additions</h3>
+                    <span id="addedCount" class="stat-value added">0</span>
+                </div>
+                <div class="stat-card">
+                    <h3>Deletions</h3>
+                    <span id="removedCount" class="stat-value removed">0</span>
+                </div>
+                <div class="stat-card">
+                    <h3>Similarity</h3>
+                    <span id="similarityScore" class="stat-value">0%</span>
+                </div>
+            </div>
+
+            <!-- Comparison Results -->
+            <div class="comparison-container">
+                <div class="document-pane">
+                    <h3>Original Document</h3>
+                    <div id="doc1Content" class="document-content"></div>
+                </div>
+                <div class="document-pane">
+                    <h3>Modified Document</h3>
+                    <div id="doc2Content" class="document-content"></div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>PDF Comparison Tool - Compare PDF documents and highlight differences</p>
+    </footer>
+
+    <!-- JavaScript Files -->
+    <script src="js/utils.js"></script>
+    <script src="js/pdf-extractor.js"></script>
+    <script src="js/comparison-engine.js"></script>
+    <script src="js/search-handler.js"></script>
+    <script src="js/ui-controller.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
