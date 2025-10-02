@@ -427,15 +427,21 @@ main {
 
 /* Hidden changes from grouped changes toggle */
 .change-hidden {
-    opacity: 0.2;
-    filter: grayscale(100%);
+    /* Remove all highlighting - make it look like normal text */
+    background-color: transparent !important;
+    color: inherit !important;
+    text-decoration: none !important;
+    padding: 0 !important;
+}
+
+.change-hidden.removed {
+    /* No strikethrough when hidden */
     text-decoration: none !important;
 }
 
-.change-hidden.removed,
 .change-hidden.added {
-    background-color: #e9ecef;
-    color: #6c757d;
+    /* No special styling when hidden */
+    background-color: transparent !important;
 }
 
 /* Button state for showing hidden changes */
