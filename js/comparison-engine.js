@@ -61,21 +61,23 @@ class ComparisonEngine {
     compareLineByLine(text1, text2) {
         const lines1 = text1.split('\n');
         const lines2 = text2.split('\n');
-        
+
         let doc1HTML = '';
         let doc2HTML = '';
         let stats = {
             addedCount: 0,
             removedCount: 0,
             unchangedCount: 0
-        };        
+        };
+        const changes = []; // Track individual changes for grouping
+
         // Use diff_match_patch on the line arrays
         const linesDiff = this.dmp.diff_main(lines1.join('\n'), lines2.join('\n'));
         this.dmp.diff_cleanupSemantic(linesDiff);
         
         linesDiff.forEach(([operation, text]) => {
             const lines = text.split('\n');
-            
+
             if (operation === 0) { // No change
                 lines.forEach(line => {
                     if (line.includes('─'.repeat(10))) {
@@ -93,6 +95,8 @@ class ComparisonEngine {
                     if (line.trim()) {
                         doc1HTML += `<span class="removed">${Utils.escapeHtml(line)}</span>\n`;
                         stats.removedCount += line.split(/\s+/).filter(w => w).length;
+                        // Track removed text for grouping
+                        changes.push({ type: 'removed', text: line.trim() });
                     }
                 });
             } else if (operation === 1) { // Addition
@@ -100,15 +104,21 @@ class ComparisonEngine {
                     if (line.trim()) {
                         doc2HTML += `<span class="added">${Utils.escapeHtml(line)}</span>\n`;
                         stats.addedCount += line.split(/\s+/).filter(w => w).length;
+                        // Track added text for grouping
+                        changes.push({ type: 'added', text: line.trim() });
                     }
                 });
             }
         });
-        
+
+        // Group changes
+        const groupedChanges = this.groupChanges(changes);
+
         return {
             doc1HTML,
             doc2HTML,
-            stats
+            stats,
+            groupedChanges
         };
     }
 
@@ -152,7 +162,8 @@ class ComparisonEngine {
             removedCount: 0,
             unchangedCount: 0
         };
-        
+        const changes = []; // Track individual changes for grouping
+
         diffs.forEach(([operation, text]) => {
             if (operation === 0) {
                 // No change
@@ -162,19 +173,89 @@ class ComparisonEngine {
             } else if (operation === -1) { // Deletion
                 doc1HTML += `<span class="removed">${Utils.escapeHtml(text)}</span>`;
                 stats.removedCount += text.split(/\s+/).filter(w => w).length;
+                // Track removed text for grouping
+                if (text.trim()) {
+                    changes.push({ type: 'removed', text: text.trim() });
+                }
             } else if (operation === 1) { // Addition
                 doc2HTML += `<span class="added">${Utils.escapeHtml(text)}</span>`;
                 stats.addedCount += text.split(/\s+/).filter(w => w).length;
+                // Track added text for grouping
+                if (text.trim()) {
+                    changes.push({ type: 'added', text: text.trim() });
+                }
             }
         });
-        
+
+        // Group changes
+        const groupedChanges = this.groupChanges(changes);
+
         return {
             doc1HTML,
             doc2HTML,
-            stats
+            stats,
+            groupedChanges
         };
     }
 
+
+    groupChanges(changes) {
+        // Pair up removed/added changes and group them
+        const pairs = [];
+        let i = 0;
+
+        while (i < changes.length) {
+            const current = changes[i];
+
+            if (current.type === 'removed' && i + 1 < changes.length && changes[i + 1].type === 'added') {
+                // Found a removed -> added pair
+                pairs.push({
+                    removed: current.text,
+                    added: changes[i + 1].text
+                });
+                i += 2;
+            } else if (current.type === 'removed') {
+                // Standalone removal (no corresponding addition)
+                pairs.push({
+                    removed: current.text,
+                    added: ''
+                });
+                i++;
+            } else if (current.type === 'added') {
+                // Standalone addition (no corresponding removal)
+                pairs.push({
+                    removed: '',
+                    added: current.text
+                });
+                i++;
+            } else {
+                i++;
+            }
+        }
+
+        // Group pairs by normalized (case-insensitive) key
+        const grouped = new Map();
+
+        pairs.forEach(pair => {
+            // Create a case-insensitive key
+            const key = `${pair.removed.toLowerCase()}→${pair.added.toLowerCase()}`;
+
+            if (grouped.has(key)) {
+                const existing = grouped.get(key);
+                existing.count++;
+            } else {
+                grouped.set(key, {
+                    removed: pair.removed,
+                    added: pair.added,
+                    count: 1,
+                    key: key
+                });
+            }
+        });
+
+        // Convert to array and sort by count (descending)
+        return Array.from(grouped.values()).sort((a, b) => b.count - a.count);
+    }
 
     calculateSimilarity(stats) {
         const totalChanges = stats.addedCount + stats.removedCount;

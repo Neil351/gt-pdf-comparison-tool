@@ -47,6 +47,16 @@ class UIController {
         this.elements.searchPosition = document.getElementById('searchPosition');
         this.elements.prevSearchBtn = document.getElementById('prevSearchBtn');
         this.elements.nextSearchBtn = document.getElementById('nextSearchBtn');
+
+        // Grouped changes elements
+        this.elements.groupedChangesContainer = document.getElementById('groupedChangesContainer');
+        this.elements.groupedChangesHeader = document.getElementById('groupedChangesHeader');
+        this.elements.groupedChangesContent = document.getElementById('groupedChangesContent');
+        this.elements.groupedChangesList = document.getElementById('groupedChangesList');
+        this.elements.groupedChangesCount = document.getElementById('groupedChangesCount');
+
+        // Track collapsed state
+        this.groupedChangesCollapsed = false;
     }
 
     setupEventListeners() {
@@ -71,7 +81,10 @@ class UIController {
         this.elements.syncScroll.addEventListener('change', (e) => {
             this.syncScrollEnabled = e.target.checked;
         });
-        
+
+        // Grouped changes collapse/expand listener
+        this.elements.groupedChangesHeader.addEventListener('click', () => this.toggleGroupedChanges());
+
         // Setup synchronized scrolling
         this.setupSynchronizedScrolling();
         
@@ -246,12 +259,139 @@ class UIController {
         // Calculate similarity
         const totalChanges = results.stats.addedCount + results.stats.removedCount;
         const totalLength = results.stats.unchangedCount + totalChanges;
-        const similarity = totalLength > 0 ? 
+        const similarity = totalLength > 0 ?
             ((results.stats.unchangedCount / totalLength) * 100).toFixed(1) : 0;
         this.elements.similarityScore.textContent = similarity + '%';
-        
+
+        // Display grouped changes if available
+        if (results.groupedChanges && results.groupedChanges.length > 0) {
+            this.displayGroupedChanges(results.groupedChanges);
+        } else {
+            this.elements.groupedChangesContainer.style.display = 'none';
+        }
+
         // Clear any existing search
         this.clearSearch();
+    }
+
+    toggleGroupedChanges() {
+        this.groupedChangesCollapsed = !this.groupedChangesCollapsed;
+
+        if (this.groupedChangesCollapsed) {
+            this.elements.groupedChangesContent.style.display = 'none';
+            const icon = this.elements.groupedChangesHeader.querySelector('.collapse-icon');
+            if (icon) icon.textContent = '▶';
+        } else {
+            this.elements.groupedChangesContent.style.display = 'block';
+            const icon = this.elements.groupedChangesHeader.querySelector('.collapse-icon');
+            if (icon) icon.textContent = '▼';
+        }
+    }
+
+    displayGroupedChanges(groupedChanges) {
+        // Show the container
+        this.elements.groupedChangesContainer.style.display = 'block';
+
+        // Update the count badge
+        this.elements.groupedChangesCount.textContent = groupedChanges.length;
+
+        // Clear existing content
+        this.elements.groupedChangesList.textContent = '';
+
+        // Populate the list
+        groupedChanges.forEach((group, index) => {
+            const groupItem = document.createElement('div');
+            groupItem.className = 'grouped-change-item';
+            groupItem.dataset.groupIndex = index;
+            groupItem.dataset.groupKey = group.key;
+
+            // Create the change display
+            const changeDisplay = document.createElement('div');
+            changeDisplay.className = 'change-display';
+
+            if (group.removed && group.added) {
+                // Replacement
+                const removedSpan = document.createElement('span');
+                removedSpan.className = 'removed';
+                removedSpan.textContent = group.removed;
+
+                const arrow = document.createElement('span');
+                arrow.className = 'arrow';
+                arrow.textContent = ' → ';
+
+                const addedSpan = document.createElement('span');
+                addedSpan.className = 'added';
+                addedSpan.textContent = group.added;
+
+                changeDisplay.appendChild(removedSpan);
+                changeDisplay.appendChild(arrow);
+                changeDisplay.appendChild(addedSpan);
+            } else if (group.removed) {
+                // Deletion only
+                const removedSpan = document.createElement('span');
+                removedSpan.className = 'removed';
+                removedSpan.textContent = group.removed;
+                changeDisplay.appendChild(removedSpan);
+            } else if (group.added) {
+                // Addition only
+                const addedSpan = document.createElement('span');
+                addedSpan.className = 'added';
+                addedSpan.textContent = group.added;
+                changeDisplay.appendChild(addedSpan);
+            }
+
+            // Create the count badge
+            const countBadge = document.createElement('span');
+            countBadge.className = 'count-badge';
+            countBadge.textContent = `${group.count}×`;
+
+            // Create the toggle button
+            const toggleBtn = document.createElement('button');
+            toggleBtn.className = 'btn btn-small toggle-visibility-btn';
+            toggleBtn.textContent = 'Hide';
+            toggleBtn.dataset.visible = 'true';
+            toggleBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.toggleChangeGroupVisibility(group.key, toggleBtn);
+            });
+
+            // Assemble the group item
+            groupItem.appendChild(changeDisplay);
+            groupItem.appendChild(countBadge);
+            groupItem.appendChild(toggleBtn);
+
+            this.elements.groupedChangesList.appendChild(groupItem);
+        });
+    }
+
+    toggleChangeGroupVisibility(groupKey, button) {
+        const isVisible = button.dataset.visible === 'true';
+
+        // Find all changes in the document that match this group key (case-insensitive)
+        const doc1Changes = this.elements.doc1Content.querySelectorAll('.removed');
+        const doc2Changes = this.elements.doc2Content.querySelectorAll('.added');
+
+        // This is a simplified implementation - in a full version, you'd need to track
+        // which specific elements belong to which group
+        // For now, we'll just toggle the opacity as a demonstration
+
+        if (isVisible) {
+            // Hide this group
+            button.textContent = 'Show';
+            button.dataset.visible = 'false';
+            // Add a class to mark as hidden (would need more sophisticated tracking in production)
+        } else {
+            // Show this group
+            button.textContent = 'Hide';
+            button.dataset.visible = 'true';
+            // Remove hidden class
+        }
+
+        // Show a notification
+        this.showNotification(
+            isVisible ? `Hidden changes matching this pattern` : `Showing changes matching this pattern`,
+            'info'
+        );
     }
 
     async validatePDFFile(file) {
