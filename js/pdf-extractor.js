@@ -2,7 +2,7 @@
 class PDFExtractor {
     constructor() {
         this.setupPDFjs();
-        this.DEFAULT_TIMEOUT = 120000; // 2 minutes default timeout
+        this.DEFAULT_TIMEOUT = Config.pdf.DEFAULT_TIMEOUT;
     }
 
     setupPDFjs() {
@@ -14,67 +14,130 @@ class PDFExtractor {
     }
 
     async extractTextFromPDF(file, timeout = this.DEFAULT_TIMEOUT) {
-        // Create timeout promise
+        const abortController = { cancelled: false };
+
+        // Create timeout promise with cancellation
         const timeoutPromise = new Promise((_, reject) => {
             setTimeout(() => {
+                abortController.cancelled = true;
                 reject(new Error(`PDF extraction timeout after ${timeout}ms. The file may be too large or complex.`));
             }, timeout);
         });
 
         // Race between actual extraction and timeout
-        return Promise.race([
-            this._doExtractTextFromPDF(file),
-            timeoutPromise
-        ]);
+        try {
+            return await Promise.race([
+                this._doExtractTextFromPDF(file, abortController),
+                timeoutPromise
+            ]);
+        } catch (error) {
+            // Ensure cancellation is set on any error
+            abortController.cancelled = true;
+            throw error;
+        }
     }
 
-    async _doExtractTextFromPDF(file) {
+    async _doExtractTextFromPDF(file, abortController = { cancelled: false }) {
         let pdf = null;
         const pages = []; // Track loaded pages for cleanup
+
         try {
+            // Validate file input
+            if (!file || !(file instanceof Blob)) {
+                throw new TypeError('Invalid file: expected a File or Blob object');
+            }
+
+            // Check file size
+            if (file.size > Config.pdf.MAX_RECOMMENDED_SIZE) {
+                console.warn(`Large PDF file detected (${(file.size / 1024 / 1024).toFixed(1)}MB). This may take a while to process.`);
+            }
+
             const arrayBuffer = await file.arrayBuffer();
-            pdf = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
+
+            // Validate arrayBuffer
+            if (!arrayBuffer || arrayBuffer.byteLength === 0) {
+                throw new Error('Failed to read file: file appears to be empty or corrupted');
+            }
+
+            // Check for cancellation before expensive operations
+            if (abortController.cancelled) {
+                throw new Error('PDF extraction cancelled');
+            }
+
+            // Load PDF document with error handling
+            try {
+                pdf = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
+            } catch (pdfError) {
+                throw new Error(`Invalid or corrupted PDF file: ${pdfError.message}`);
+            }
+
+            // Validate PDF document
+            if (!pdf || !pdf.numPages || pdf.numPages === 0) {
+                throw new Error('PDF file contains no pages');
+            }
+
             let fullText = '';
 
             for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-                const page = await pdf.getPage(pageNum);
-                pages.push(page); // Track page for cleanup
-
-                const textContent = await page.getTextContent();
-                const viewport = page.getViewport({ scale: 1.0 });
-
-                // Add page separator
-                if (pageNum > 1) {
-                    fullText += '\n\n' + '─'.repeat(80) + '\n' + `Page ${pageNum}` + '\n' + '─'.repeat(80) + '\n\n';
+                // Check for cancellation before processing each page
+                if (abortController.cancelled) {
+                    throw new Error('PDF extraction cancelled');
                 }
 
-                // Process text with improved formatting preservation
-                const pageText = this.preserveFormatting(textContent, viewport);
-                fullText += pageText;
+                try {
+                    const page = await pdf.getPage(pageNum);
+                    pages.push(page); // Track page for cleanup
+
+                    const textContent = await page.getTextContent();
+                    const viewport = page.getViewport({ scale: 1.0 });
+
+                    // Add page separator
+                    if (pageNum > 1) {
+                        fullText += '\n\n' + '─'.repeat(Config.pdf.PAGE_SEPARATOR_LENGTH) + '\n' + `Page ${pageNum}` + '\n' + '─'.repeat(Config.pdf.PAGE_SEPARATOR_LENGTH) + '\n\n';
+                    }
+
+                    // Process text with improved formatting preservation
+                    const pageText = this.preserveFormatting(textContent, viewport);
+                    fullText += pageText;
+                } catch (pageError) {
+                    console.error(`Error processing page ${pageNum}:`, pageError);
+                    throw new Error(`Failed to extract text from page ${pageNum}: ${pageError.message}`);
+                }
             }
 
             return fullText;
         } catch (error) {
-            throw new Error(`PDF extraction failed: ${error.message}`);
+            // Provide context-specific error messages
+            if (error.message === 'PDF extraction cancelled') {
+                throw error;
+            }
+
+            if (error instanceof TypeError) {
+                throw error; // Re-throw TypeError with original message
+            }
+
+            // Wrap other errors with context
+            throw new Error(`PDF extraction failed: ${error.message || 'Unknown error'}`);
         } finally {
+            // Always clean up resources, even if cancelled
             // Clean up page resources first
             pages.forEach(page => {
                 try {
-                    if (page && page.cleanup) {
+                    if (page && typeof page.cleanup === 'function') {
                         page.cleanup();
                     }
                 } catch (e) {
-                    // Ignore cleanup errors
+                    // Ignore cleanup errors but log them
                     console.warn('Page cleanup warning:', e.message);
                 }
             });
 
             // Then clean up PDF.js document resources
-            if (pdf) {
+            if (pdf && typeof pdf.destroy === 'function') {
                 try {
                     pdf.destroy();
                 } catch (e) {
-                    // Ignore cleanup errors
+                    // Ignore cleanup errors but log them
                     console.warn('PDF cleanup warning:', e.message);
                 }
             }
@@ -84,7 +147,7 @@ class PDFExtractor {
     preserveFormatting(textContent, viewport) {
         // Group text by Y position (lines) with improved tolerance
         const textByLine = {};
-        const threshold = 5; // Increased from 3 to handle more PDF variations
+        const threshold = Config.pdf.LINE_GROUPING_THRESHOLD;
         
         textContent.items.forEach(item => {
             // Skip empty text items
@@ -126,7 +189,7 @@ class PDFExtractor {
         
         sortedLines.forEach(y => {
             // Add extra line break for significant vertical gaps
-            if (previousY && (previousY - y) > 30) { // Increased from 20
+            if (previousY && (previousY - y) > Config.pdf.VERTICAL_GAP_THRESHOLD) {
                 pageText += '\n';
             }
             
@@ -139,11 +202,11 @@ class PDFExtractor {
             lineItems.forEach(item => {
                 // Improved space calculation
                 const gap = item.x - previousX;
-                if (previousX > 0 && gap > 5) { // Reduced from 10
+                if (previousX > 0 && gap > Config.pdf.HORIZONTAL_GAP_THRESHOLD) {
                     // More consistent space calculation
                     const avgCharWidth = item.width / (item.text.length || 1);
                     const spaces = Math.round(gap / avgCharWidth);
-                    lineText += ' '.repeat(Math.max(1, Math.min(spaces, 3))); // Cap at 3 spaces
+                    lineText += ' '.repeat(Math.max(1, Math.min(spaces, Config.pdf.MAX_SPACES_BETWEEN_WORDS)));
                 }
                 
                 lineText += item.text;

@@ -275,6 +275,12 @@ class UIController {
     }
 
     toggleGroupedChanges() {
+        // Validate required elements exist
+        if (!this.elements || !this.elements.groupedChangesContent || !this.elements.groupedChangesHeader) {
+            console.error('toggleGroupedChanges: Required elements not found');
+            return;
+        }
+
         this.groupedChangesCollapsed = !this.groupedChangesCollapsed;
 
         if (this.groupedChangesCollapsed) {
@@ -289,6 +295,13 @@ class UIController {
     }
 
     displayGroupedChanges(groupedChanges) {
+        // Input validation
+        if (!Array.isArray(groupedChanges)) {
+            console.error('displayGroupedChanges: Expected an array, received:', typeof groupedChanges);
+            this.showNotification('Failed to display grouped changes: invalid data format', 'error');
+            return;
+        }
+
         // Show the container
         this.elements.groupedChangesContainer.style.display = 'block';
 
@@ -300,6 +313,21 @@ class UIController {
 
         // Populate the list
         groupedChanges.forEach((group, index) => {
+            // Validate individual group object
+            if (!group || typeof group !== 'object') {
+                console.warn(`displayGroupedChanges: Invalid group at index ${index}:`, group);
+                return;
+            }
+
+            if (!group.key || typeof group.key !== 'string') {
+                console.warn(`displayGroupedChanges: Group at index ${index} missing valid key:`, group);
+                return;
+            }
+
+            if (typeof group.count !== 'number' || group.count < 1) {
+                console.warn(`displayGroupedChanges: Group at index ${index} has invalid count:`, group.count);
+                return;
+            }
             const groupItem = document.createElement('div');
             groupItem.className = 'grouped-change-item';
             groupItem.dataset.groupIndex = index;
@@ -340,6 +368,16 @@ class UIController {
                 changeDisplay.appendChild(addedSpan);
             }
 
+            // Add case variation indicator if applicable
+            if (group.hasCaseVariations) {
+                const caseIndicator = document.createElement('span');
+                caseIndicator.className = 'case-variation-indicator';
+                caseIndicator.textContent = ' ⚠';
+                caseIndicator.title = 'This group contains case variations (e.g., "Color" vs "color")';
+                caseIndicator.style.cssText = 'color: #f39c12; cursor: help; font-size: 0.85em;';
+                changeDisplay.appendChild(caseIndicator);
+            }
+
             // Create the count badge
             const countBadge = document.createElement('span');
             countBadge.className = 'count-badge';
@@ -365,10 +403,19 @@ class UIController {
     }
 
     toggleChangeGroupVisibility(groupKey, button) {
+        // Input validation
+        if (!groupKey || typeof groupKey !== 'string') {
+            console.error('toggleChangeGroupVisibility: Invalid groupKey:', groupKey);
+            this.showNotification('Failed to toggle visibility: invalid group identifier', 'error');
+            return;
+        }
+
         const isVisible = button.dataset.visible === 'true';
 
         // Find all elements with this group key in both documents
-        const selector = `[data-group="${groupKey}"]`;
+        // Use CSS.escape to prevent selector injection
+        const escapedKey = CSS.escape(groupKey);
+        const selector = `[data-group="${escapedKey}"]`;
         const doc1Elements = this.elements.doc1Content.querySelectorAll(selector);
         const doc2Elements = this.elements.doc2Content.querySelectorAll(selector);
 

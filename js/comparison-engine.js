@@ -113,8 +113,9 @@ class ComparisonEngine {
         });
 
         // Second pass: generate HTML with group keys
-        let doc1HTML = '';
-        let doc2HTML = '';
+        // Use arrays for O(n) performance instead of O(n²) string concatenation
+        const doc1Parts = [];
+        const doc2Parts = [];
 
         linesDiff.forEach(([operation, text]) => {
             const lines = text.split('\n');
@@ -123,33 +124,33 @@ class ComparisonEngine {
                 lines.forEach(line => {
                     if (line.includes('─'.repeat(10))) {
                         // Page separator
-                        doc1HTML += `<div class="page-separator">${Utils.escapeHtml(line)}</div>`;
-                        doc2HTML += `<div class="page-separator">${Utils.escapeHtml(line)}</div>`;
+                        doc1Parts.push(`<div class="page-separator">${Utils.escapeHtml(line)}</div>`);
+                        doc2Parts.push(`<div class="page-separator">${Utils.escapeHtml(line)}</div>`);
                     } else {
-                        doc1HTML += Utils.escapeHtml(line) + '\n';
-                        doc2HTML += Utils.escapeHtml(line) + '\n';
+                        doc1Parts.push(Utils.escapeHtml(line), '\n');
+                        doc2Parts.push(Utils.escapeHtml(line), '\n');
                     }
                 });
             } else if (operation === -1) { // Deletion
                 lines.forEach(line => {
                     if (line.trim()) {
                         const groupKey = textToGroupKey.get(`removed:${line.trim().toLowerCase()}`) || '';
-                        doc1HTML += `<span class="removed" data-group="${groupKey}">${Utils.escapeHtml(line)}</span>\n`;
+                        doc1Parts.push(`<span class="removed" data-group="${groupKey}">${Utils.escapeHtml(line)}</span>\n`);
                     }
                 });
             } else if (operation === 1) { // Addition
                 lines.forEach(line => {
                     if (line.trim()) {
                         const groupKey = textToGroupKey.get(`added:${line.trim().toLowerCase()}`) || '';
-                        doc2HTML += `<span class="added" data-group="${groupKey}">${Utils.escapeHtml(line)}</span>\n`;
+                        doc2Parts.push(`<span class="added" data-group="${groupKey}">${Utils.escapeHtml(line)}</span>\n`);
                     }
                 });
             }
         });
 
         return {
-            doc1HTML,
-            doc2HTML,
+            doc1HTML: doc1Parts.join(''),
+            doc2HTML: doc2Parts.join(''),
             stats,
             groupedChanges
         };
@@ -226,65 +227,123 @@ class ComparisonEngine {
         });
 
         // Second pass: generate HTML with group keys
-        let doc1HTML = '';
-        let doc2HTML = '';
+        // Use arrays for O(n) performance instead of O(n²) string concatenation
+        const doc1Parts = [];
+        const doc2Parts = [];
 
         diffs.forEach(([operation, text]) => {
             if (operation === 0) {
                 // No change
-                doc1HTML += Utils.escapeHtml(text);
-                doc2HTML += Utils.escapeHtml(text);
+                doc1Parts.push(Utils.escapeHtml(text));
+                doc2Parts.push(Utils.escapeHtml(text));
             } else if (operation === -1) { // Deletion
                 const groupKey = textToGroupKey.get(`removed:${text.trim().toLowerCase()}`) || '';
-                doc1HTML += `<span class="removed" data-group="${groupKey}">${Utils.escapeHtml(text)}</span>`;
+                doc1Parts.push(`<span class="removed" data-group="${groupKey}">${Utils.escapeHtml(text)}</span>`);
             } else if (operation === 1) { // Addition
                 const groupKey = textToGroupKey.get(`added:${text.trim().toLowerCase()}`) || '';
-                doc2HTML += `<span class="added" data-group="${groupKey}">${Utils.escapeHtml(text)}</span>`;
+                doc2Parts.push(`<span class="added" data-group="${groupKey}">${Utils.escapeHtml(text)}</span>`);
             }
         });
 
         return {
-            doc1HTML,
-            doc2HTML,
+            doc1HTML: doc1Parts.join(''),
+            doc2HTML: doc2Parts.join(''),
             stats,
             groupedChanges
         };
     }
 
 
-    groupChanges(changes) {
-        // Pair up removed/added changes and group them
-        const pairs = [];
-        let i = 0;
+    // Calculate similarity between two strings using Levenshtein distance
+    calculateStringSimilarity(str1, str2) {
+        const len1 = str1.length;
+        const len2 = str2.length;
 
-        while (i < changes.length) {
-            const current = changes[i];
+        if (len1 === 0) return len2;
+        if (len2 === 0) return len1;
 
-            if (current.type === 'removed' && i + 1 < changes.length && changes[i + 1].type === 'added') {
-                // Found a removed -> added pair
-                pairs.push({
-                    removed: current.text,
-                    added: changes[i + 1].text
-                });
-                i += 2;
-            } else if (current.type === 'removed') {
-                // Standalone removal (no corresponding addition)
-                pairs.push({
-                    removed: current.text,
-                    added: ''
-                });
-                i++;
-            } else if (current.type === 'added') {
-                // Standalone addition (no corresponding removal)
-                pairs.push({
-                    removed: '',
-                    added: current.text
-                });
-                i++;
-            } else {
-                i++;
+        // Create distance matrix
+        const matrix = Array(len1 + 1).fill(null).map(() => Array(len2 + 1).fill(0));
+
+        for (let i = 0; i <= len1; i++) matrix[i][0] = i;
+        for (let j = 0; j <= len2; j++) matrix[0][j] = j;
+
+        for (let i = 1; i <= len1; i++) {
+            for (let j = 1; j <= len2; j++) {
+                const cost = str1[i - 1].toLowerCase() === str2[j - 1].toLowerCase() ? 0 : 1;
+                matrix[i][j] = Math.min(
+                    matrix[i - 1][j] + 1,      // deletion
+                    matrix[i][j - 1] + 1,      // insertion
+                    matrix[i - 1][j - 1] + cost // substitution
+                );
             }
         }
+
+        const distance = matrix[len1][len2];
+        const maxLen = Math.max(len1, len2);
+        return maxLen === 0 ? 1 : 1 - (distance / maxLen); // Normalized similarity (0-1)
+    }
+
+    groupChanges(changes) {
+        // Separate removals and additions
+        const removals = changes.filter(c => c.type === 'removed');
+        const additions = changes.filter(c => c.type === 'added');
+
+        const pairs = [];
+        const usedRemovals = new Set();
+        const usedAdditions = new Set();
+
+        // Find best matches using similarity scoring
+        // For each removal, find the most similar addition
+        removals.forEach((removal, removalIndex) => {
+            if (usedRemovals.has(removalIndex)) return;
+
+            let bestMatch = null;
+            let bestSimilarity = Config.comparison.SIMILARITY_THRESHOLD;
+            let bestAdditionIndex = -1;
+
+            additions.forEach((addition, additionIndex) => {
+                if (usedAdditions.has(additionIndex)) return;
+
+                const similarity = this.calculateStringSimilarity(removal.text, addition.text);
+
+                if (similarity > bestSimilarity) {
+                    bestSimilarity = similarity;
+                    bestMatch = addition;
+                    bestAdditionIndex = additionIndex;
+                }
+            });
+
+            if (bestMatch) {
+                // Found a good match
+                pairs.push({
+                    removed: removal.text,
+                    added: bestMatch.text
+                });
+                usedRemovals.add(removalIndex);
+                usedAdditions.add(bestAdditionIndex);
+            }
+        });
+
+        // Add standalone removals (no good match found)
+        removals.forEach((removal, index) => {
+            if (!usedRemovals.has(index)) {
+                pairs.push({
+                    removed: removal.text,
+                    added: ''
+                });
+            }
+        });
+
+        // Add standalone additions (no good match found)
+        additions.forEach((addition, index) => {
+            if (!usedAdditions.has(index)) {
+                pairs.push({
+                    removed: '',
+                    added: addition.text
+                });
+            }
+        });
 
         // Group pairs by normalized (case-insensitive) key
         const grouped = new Map();
@@ -296,12 +355,18 @@ class ComparisonEngine {
             if (grouped.has(key)) {
                 const existing = grouped.get(key);
                 existing.count++;
+
+                // Track case variations
+                if (pair.removed !== existing.removed || pair.added !== existing.added) {
+                    existing.hasCaseVariations = true;
+                }
             } else {
                 grouped.set(key, {
                     removed: pair.removed,
                     added: pair.added,
                     count: 1,
-                    key: key
+                    key: key,
+                    hasCaseVariations: false
                 });
             }
         });

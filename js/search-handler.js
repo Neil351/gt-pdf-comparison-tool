@@ -1,8 +1,15 @@
 class SearchHandler {
     constructor(doc1Element, doc2Element) {
+        // Validate that both parameters are provided
         if (!doc1Element || !doc2Element) {
             throw new Error('Both document elements are required for SearchHandler');
         }
+
+        // Validate that parameters are actual DOM elements
+        if (!(doc1Element instanceof Element) || !(doc2Element instanceof Element)) {
+            throw new TypeError('SearchHandler requires valid DOM elements');
+        }
+
         this.doc1 = doc1Element;
         this.doc2 = doc2Element;
         this.searchResults = { doc1: [], doc2: [] };
@@ -10,9 +17,17 @@ class SearchHandler {
         this.isSearching = false; // Lock to prevent concurrent searches
     }
 
-    // Fixed escapeRegExp function
+    // Escape special RegExp characters to treat search term as literal text
     escapeRegExp(string) {
-        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        // Input validation
+        if (typeof string !== 'string') {
+            console.warn('escapeRegExp: Expected string, received:', typeof string);
+            return String(string || '');
+        }
+
+        // Escape all special RegExp characters
+        // Pattern includes: . * + ? ^ $ { } ( ) | [ ] \ -
+        return string.replace(/[.*+?^${}()|[\]\\-]/g, '\\$&');
     }
 
     performSearch(searchTerm, caseSensitive = false) {
@@ -72,14 +87,13 @@ class SearchHandler {
 
         let match;
         let iterationCount = 0;
-        const MAX_ITERATIONS = 100000; // Safety limit to prevent infinite loops
 
         while ((match = searchRegex.exec(text)) !== null) {
             // Always increment iteration count, even for empty matches
             iterationCount++;
 
             // Safety check for too many iterations
-            if (iterationCount > MAX_ITERATIONS) {
+            if (iterationCount > Config.search.MAX_ITERATIONS) {
                 console.error('Search iteration limit exceeded. Stopping search.');
                 // Show user notification if available
                 if (this.showNotification && typeof this.showNotification === 'function') {
@@ -157,32 +171,49 @@ class SearchHandler {
         // Sort by absolute position (reverse) to maintain positions
         nodesToProcess.sort((a, b) => b.absoluteStart - a.absoluteStart);
 
-        // Process each match
-        nodesToProcess.forEach(({node, start, end, matchIndex}) => {
-            if (!node.parentNode) return; // Node may have been processed already
+        // Batch DOM updates to prevent reflow thrashing
+        // Use requestAnimationFrame for smoother updates
+        requestAnimationFrame(() => {
+            // Hide element during updates to reduce reflows
+            const originalDisplay = element.style.display;
+            element.style.display = 'none';
 
-            const text = node.textContent;
-            const beforeText = text.substring(0, start);
-            const matchText = text.substring(start, end);
-            const afterText = text.substring(end);
+            try {
+                // Process each match
+                nodesToProcess.forEach(({node, start, end, matchIndex}) => {
+                    if (!node.parentNode) return; // Node may have been processed already
 
-            // Create highlight span
-            const highlight = document.createElement('span');
-            highlight.className = 'highlight';
-            highlight.setAttribute('data-match-index', matchIndex);
-            highlight.textContent = matchText;
+                    const text = node.textContent;
+                    const beforeText = text.substring(0, start);
+                    const matchText = text.substring(start, end);
+                    const afterText = text.substring(end);
 
-            const parent = node.parentNode;
+                    // Create highlight span
+                    const highlight = document.createElement('span');
+                    highlight.className = 'highlight';
+                    highlight.setAttribute('data-match-index', matchIndex);
+                    highlight.textContent = matchText;
 
-            // Replace the text node with new structure
-            if (beforeText) {
-                parent.insertBefore(document.createTextNode(beforeText), node);
+                    const parent = node.parentNode;
+
+                    // Use DocumentFragment to batch DOM changes
+                    const fragment = document.createDocumentFragment();
+
+                    if (beforeText) {
+                        fragment.appendChild(document.createTextNode(beforeText));
+                    }
+                    fragment.appendChild(highlight);
+                    if (afterText) {
+                        fragment.appendChild(document.createTextNode(afterText));
+                    }
+
+                    // Single DOM operation per node
+                    parent.replaceChild(fragment, node);
+                });
+            } finally {
+                // Restore visibility
+                element.style.display = originalDisplay;
             }
-            parent.insertBefore(highlight, node);
-            if (afterText) {
-                parent.insertBefore(document.createTextNode(afterText), node);
-            }
-            parent.removeChild(node);
         });
     }
 
