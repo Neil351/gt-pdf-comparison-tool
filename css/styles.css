@@ -470,8 +470,12 @@ main {
     color: #666;
     font-size: 0.8rem;
     text-align: center;
-    margin: 1rem 0;
+    margin: 2.5rem 0;
+    padding: 1rem 0;
     opacity: 0.7;
+    border-top: 2px solid #ddd;
+    border-bottom: 2px solid #ddd;
+    background-color: #f8f9fa;
 }
 
 /* Loading State */
