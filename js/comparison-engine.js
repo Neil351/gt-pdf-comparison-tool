@@ -136,6 +136,8 @@ class ComparisonEngine {
                     if (line.trim()) {
                         const groupKey = textToGroupKey.get(`removed:${line.trim().toLowerCase()}`) || '';
                         doc1Parts.push(`<span class="removed" data-group="${groupKey}">${Utils.escapeHtml(line)}</span>\n`);
+                        // Add placeholder in doc2 to maintain alignment
+                        doc2Parts.push(`<div class="change-placeholder removed-placeholder">[removed content]</div>\n`);
                     }
                 });
             } else if (operation === 1) { // Addition
@@ -143,6 +145,8 @@ class ComparisonEngine {
                     if (line.trim()) {
                         const groupKey = textToGroupKey.get(`added:${line.trim().toLowerCase()}`) || '';
                         doc2Parts.push(`<span class="added" data-group="${groupKey}">${Utils.escapeHtml(line)}</span>\n`);
+                        // Add placeholder in doc1 to maintain alignment
+                        doc1Parts.push(`<div class="change-placeholder added-placeholder">[added content]</div>\n`);
                     }
                 });
             }
@@ -239,9 +243,13 @@ class ComparisonEngine {
             } else if (operation === -1) { // Deletion
                 const groupKey = textToGroupKey.get(`removed:${text.trim().toLowerCase()}`) || '';
                 doc1Parts.push(`<span class="removed" data-group="${groupKey}">${Utils.escapeHtml(text)}</span>`);
+                // Add placeholder in doc2 to maintain alignment
+                doc2Parts.push(`<span class="change-placeholder removed-placeholder">${' '.repeat(text.length)}</span>`);
             } else if (operation === 1) { // Addition
                 const groupKey = textToGroupKey.get(`added:${text.trim().toLowerCase()}`) || '';
                 doc2Parts.push(`<span class="added" data-group="${groupKey}">${Utils.escapeHtml(text)}</span>`);
+                // Add placeholder in doc1 to maintain alignment
+                doc1Parts.push(`<span class="change-placeholder added-placeholder">${' '.repeat(text.length)}</span>`);
             }
         });
 

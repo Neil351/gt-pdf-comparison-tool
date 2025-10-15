@@ -425,6 +425,29 @@ main {
     border-radius: 2px;
 }
 
+/* Alignment Placeholders */
+.change-placeholder {
+    display: block;
+    opacity: 0.4;
+    font-style: italic;
+    font-size: 0.85em;
+    padding: 2px 8px;
+    margin: 2px 0;
+    user-select: none;
+    text-align: center;
+    color: #666;
+}
+
+.removed-placeholder {
+    background-color: #f8d7da;
+    border-left: 3px solid #e74c3c;
+}
+
+.added-placeholder {
+    background-color: #d4edda;
+    border-left: 3px solid #27ae60;
+}
+
 /* Hidden changes from grouped changes toggle */
 .change-hidden {
     /* Remove all highlighting - make it look like normal text */

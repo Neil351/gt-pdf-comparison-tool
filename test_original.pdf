@@ -1,0 +1,125 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /Resources << /Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> >> >> /MediaBox [0 0 612 792] /Contents 5 0 R >>
+endobj
+4 0 obj
+<< /Type /Page /Parent 2 0 R /Resources << /Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> >> >> /MediaBox [0 0 612 792] /Contents 6 0 R >>
+endobj
+5 0 obj
+<< /Length 759 >>
+stream
+BT
+/F1 12 Tf
+50 750 Td
+(Project Requirements Document) Tj
+0 -15 Td
+() Tj
+0 -15 Td
+(Version: 1.0) Tj
+0 -15 Td
+(Date: January 15, 2024) Tj
+0 -15 Td
+() Tj
+0 -15 Td
+(1. Introduction) Tj
+0 -15 Td
+(This document outlines the requirements for the new software system.) Tj
+0 -15 Td
+() Tj
+0 -15 Td
+(2. System Overview) Tj
+0 -15 Td
+(The system will provide user authentication and data management.) Tj
+0 -15 Td
+() Tj
+0 -15 Td
+(3. Functional Requirements) Tj
+0 -15 Td
+(- User registration and login) Tj
+0 -15 Td
+(- Password reset functionality) Tj
+0 -15 Td
+(- Profile management) Tj
+0 -15 Td
+(- Data export in CSV format) Tj
+0 -15 Td
+() Tj
+0 -15 Td
+(4. Technical Requirements) Tj
+0 -15 Td
+(- Database: PostgreSQL 12+) Tj
+0 -15 Td
+(- Backend: Python 3.8+) Tj
+0 -15 Td
+ET
+endstream
+endobj
+6 0 obj
+<< /Length 716 >>
+stream
+BT
+/F1 12 Tf
+50 750 Td
+(- Frontend: React 17+) Tj
+0 -15 Td
+() Tj
+0 -15 Td
+(-------------------- Page 2 --------------------) Tj
+0 -15 Td
+() Tj
+0 -15 Td
+(5. Security Requirements) Tj
+0 -15 Td
+(- HTTPS encryption required) Tj
+0 -15 Td
+(- Password hashing using bcrypt) Tj
+0 -15 Td
+(- Session timeout after 30 minutes) Tj
+0 -15 Td
+() Tj
+0 -15 Td
+(6. Performance Requirements) Tj
+0 -15 Td
+(- Page load time under 2 seconds) Tj
+0 -15 Td
+(- Support 1000 concurrent users) Tj
+0 -15 Td
+() Tj
+0 -15 Td
+(7. Deployment) Tj
+0 -15 Td
+(- Deploy to AWS infrastructure) Tj
+0 -15 Td
+(- Use Docker containers) Tj
+0 -15 Td
+() Tj
+0 -15 Td
+(8. Timeline) Tj
+0 -15 Td
+(- Phase 1: 3 months) Tj
+0 -15 Td
+(- Phase 2: 2 months) Tj
+0 -15 Td
+ET
+endstream
+endobj
+xref
+0 7
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000125 00000 n 
+0000002135 00000 n 
+0000000000 00000 n 
+0000000000 00000 n 
+trailer
+<< /Size 7 /Root 1 0 R >>
+startxref
+2239
+%%EOF
