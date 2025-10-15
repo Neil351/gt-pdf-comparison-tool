@@ -17,10 +17,15 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Initialize FastAPI app
+# Set root_path to serve under a subpath (e.g., /pdf-comparison-tool)
+# Leave empty string "" to serve at root
+ROOT_PATH = "/pdf-comparison-tool"
+
 app = FastAPI(
     title="PDF Comparison Tool",
     description="Web-based tool for comparing PDF documents and highlighting differences",
     version="1.0.0",
+    root_path=ROOT_PATH,
     docs_url="/api/docs",
     redoc_url="/api/redoc"
 )
@@ -107,7 +112,12 @@ async def startup_event():
     logger.info("PDF Comparison Tool Server Starting")
     logger.info("=" * 60)
     logger.info(f"Base directory: {BASE_DIR}")
-    logger.info(f"API documentation available at: http://localhost/api/docs")
+    if ROOT_PATH:
+        logger.info(f"Application available at: http://localhost{ROOT_PATH}")
+        logger.info(f"API documentation available at: http://localhost{ROOT_PATH}/api/docs")
+    else:
+        logger.info(f"Application available at: http://localhost")
+        logger.info(f"API documentation available at: http://localhost/api/docs")
     logger.info("Server ready to accept connections")
 
 
